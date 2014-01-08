@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from uuidfield import UUIDField
+from django.core.exceptions import ObjectDoesNotExist
 
 
 # Compatibility with custom user models, while keeping backwards-compatibility with <1.5
@@ -80,3 +81,16 @@ class APNSDevice(Device):
 	def send_message(self, message, **kwargs):
 		from .apns import apns_send_message
 		return apns_send_message(registration_id=self.registration_id, data=message, **kwargs)
+
+	@classmethod
+	def deactivate_unused(cls):
+		from .apns import apns_get_feedback
+		devices = apns_get_feedback()
+		for device in devices:
+			print device
+			try:
+				obj = cls.objects.get(registration_id=device["token"])
+				obj.active = False
+				obj.save()
+			except cls.DoesNotExist:
+				pass

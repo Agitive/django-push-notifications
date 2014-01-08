@@ -9,10 +9,10 @@ import ssl
 import struct
 from binascii import unhexlify
 from socket import socket
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from . import NotificationError
 from .settings import PUSH_NOTIFICATIONS_SETTINGS as SETTINGS
+from datetime import datetime
 
 
 class APNSError(NotificationError):
@@ -23,9 +23,11 @@ class APNSDataOverflow(APNSError):
 	pass
 
 APNS_MAX_NOTIFICATION_SIZE = 256
+APNS_SOCKET = 0
+APNS_FEEDBACK_SOCKET = 1
 
 
-def _apns_create_socket():
+def _apns_create_socket(socket_type):
 	sock = socket()
 	certfile = SETTINGS.get("APNS_CERTIFICATE")
 	if not certfile:
@@ -41,17 +43,27 @@ def _apns_create_socket():
 		raise ImproperlyConfigured("The APNS certificate file at %r is not readable: %s" % (certfile, e))
 
 	sock = ssl.wrap_socket(sock, ssl_version=ssl.PROTOCOL_SSLv3, certfile=certfile)
-	sock.connect((SETTINGS["APNS_HOST"], SETTINGS["APNS_PORT"]))
+	if socket_type is APNS_SOCKET:
+		sock.connect((SETTINGS["APNS_HOST"], SETTINGS["APNS_PORT"]))
+	else:
+		sock.connect((SETTINGS["APNS_FEEDBACK_HOST"], SETTINGS["APNS_FEEDBACK_PORT"]))
 
 	return sock
 
 
 def _apns_pack_message(token, data):
-	format = "!cH32sH%ds" % (len(data))
-	return struct.pack(format, b"\0", 32, unhexlify(token), len(data), data)
+	fmt = "!cH32sH%ds" % (len(data))
+	return struct.pack(fmt, b"\0", 32, unhexlify(token), len(data), data)
 
 
-def _apns_send(token, alert, badge=0, sound="chime", content_available=False, action_loc_key=None, loc_key=None, loc_args=[], extra={}, socket=None):
+def _apns_unpack_feedback(data):
+	fmt = '!lh32s'
+	timestamp, _, token = struct.unpack(fmt, data)
+	return timestamp, token
+
+
+def _apns_send(token, alert, badge=0, sound="chime", content_available=False, action_loc_key=None, loc_key=None,
+				loc_args=None, extra=None, socket=None):
 	data = {}
 
 	if action_loc_key or loc_key or loc_args:
@@ -74,7 +86,8 @@ def _apns_send(token, alert, badge=0, sound="chime", content_available=False, ac
 	if content_available:
 		data["content-available"] = 1
 
-	data.update(extra)
+	if extra:
+		data.update(extra)
 
 	# convert to json, avoiding unnecessary whitespace with separators
 	data = json.dumps({"aps": data}, separators=(",", ":"))
@@ -87,7 +100,7 @@ def _apns_send(token, alert, badge=0, sound="chime", content_available=False, ac
 	if socket:
 		socket.write(data)
 	else:
-		socket = _apns_create_socket()
+		socket = _apns_create_socket(APNS_SOCKET)
 		socket.write(data)
 		socket.close()
 
@@ -109,8 +122,24 @@ def apns_send_bulk_message(registration_ids, data, **kwargs):
 	Sends an APNS notification to one or more registration_ids.
 	The registration_ids argument needs to be a list.
 	"""
-	socket = _apns_create_socket()
+	socket = _apns_create_socket(APNS_SOCKET)
 	for registration_id in registration_ids:
 		_apns_send(registration_id, data, socket=socket, **kwargs)
 
 	socket.close()
+
+
+def apns_get_feedback():
+	socket = _apns_create_socket(APNS_FEEDBACK_SOCKET)
+	devices = []
+	while True:
+		data = socket.recv(38)
+		if len(data) is 0:
+			break
+		timestamp, token = _apns_unpack_feedback(data)
+		devices.append({
+			'timestamp': datetime.utcfromtimestamp(timestamp),
+		    'token': token
+		})
+	socket.close()
+	return devices
