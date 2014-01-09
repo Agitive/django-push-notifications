@@ -12,3 +12,6 @@ build
 
 # virtualenv
 .env
+
+# egg
+*.egg-info

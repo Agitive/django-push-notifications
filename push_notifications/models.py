@@ -57,6 +57,7 @@ class GCMDevice(Device):
 		from .gcm import gcm_send_message
 		return gcm_send_message(registration_id=self.registration_id, data={"message": message}, collapse_key="message")
 
+	# we have to deactivate unused devices using the request_ids notified and the data returned by the server
 	@classmethod
 	def deactivate_unused(cls, registration_ids, data):
 		data = json.loads(data)
