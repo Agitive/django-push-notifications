@@ -1,3 +1,5 @@
+import json
+import itertools
 from django.conf import settings
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
@@ -55,6 +57,24 @@ class GCMDevice(Device):
 		from .gcm import gcm_send_message
 		return gcm_send_message(registration_id=self.registration_id, data={"message": message}, collapse_key="message")
 
+	@classmethod
+	def deactivate_unused(cls, registration_ids, data):
+		data = json.loads(data)
+		if data['failure'] > 0 or data['canonical_ids'] > 0:
+			results = data['results']
+			for registration_id, result in itertools.izip(registration_ids, results):
+				if 'message_id'in result and 'registration_id' in result:
+					obj = cls.objects.get(registration_id=registration_id)
+					if cls.objects.filter(registration_id=result['registration_id']).count() > 0:
+						obj.active = False
+					else:
+						obj.registration_id = result['registration_id']
+					obj.save()
+				elif 'error' in result and result['error'] == 'NotRegistered':
+					obj = cls.objects.get(registration_id=registration_id)
+					obj.active = False
+					obj.save()
+
 
 class APNSDeviceManager(models.Manager):
 	def get_query_set(self):
@@ -87,7 +107,6 @@ class APNSDevice(Device):
 		from .apns import apns_get_feedback
 		devices = apns_get_feedback()
 		for device in devices:
-			print device
 			try:
 				obj = cls.objects.get(registration_id=device["token"])
 				obj.active = False
