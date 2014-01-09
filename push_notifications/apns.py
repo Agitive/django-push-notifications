@@ -1,7 +1,8 @@
 """
 Apple Push Notification Service
 Documentation is available on the iOS Developer Library:
-https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html
+https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/...
+ApplePushService.html
 """
 
 import json
@@ -139,7 +140,7 @@ def apns_get_feedback():
 		timestamp, token = _apns_unpack_feedback(data)
 		devices.append({
 			'timestamp': datetime.utcfromtimestamp(timestamp),
-		    'token': token
+			'token': token
 		})
 	socket.close()
 	return devices
