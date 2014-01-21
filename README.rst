@@ -1,6 +1,9 @@
 django-push-notifications
 =========================
 
+.. image:: https://api.travis-ci.org/Adys/django-push-notifications.png
+	:target: https://travis-ci.org/Adys/django-push-notifications
+
 A minimal Django app that implements Device models that can send messages through APNS and GCM.
 
 The app implements two models: GCMDevice and APNSDevice. Those models share the same attributes:
@@ -23,6 +26,8 @@ All versions of Django 1.0 and newer should be supported, however no guarantees 
 The app also depends on django-uuidfield.
 
 Tastypie support should work on Tastypie 0.9.11 and newer.
+
+Django versions older than 1.5 require 'six' to be installed.
 
 
 Setup
@@ -116,3 +121,12 @@ the device they register.
 Subclassing the authenticated resources in order to add a SameUserAuthentication and a user ForeignKey is recommended.
 
 When registered, the APIs will show up at <api_root>/device/apns and <api_root>/device/gcm, respectively.
+
+
+Python 3 support
+----------------
+
+django-push-notifications has been tested on Python 3 and should work. However, the django-uuidfield dependency does not
+officially support Python 3. A pull request is pending and can be used for the time being::
+
+	pip install -e git://github.com/dominicrodger/django-uuidfield.git@python3#egg=django_uuidfield
